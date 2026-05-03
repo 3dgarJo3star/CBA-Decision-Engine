@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBA Decision Engine — AOE2</title>
+<link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a08;
+    --surface: #111109;
+    --card: #181710;
+    --border: #2e2a1a;
+    --gold: #c9a84c;
+    --gold-light: #e8c96a;
+    --gold-dim: #7a6230;
+    --red: #c03030;
+    --green: #3a7a3a;
+    --green-light: #5ab55a;
+    --amber: #c07820;
+    --text: #d4c89a;
+    --text-dim: #7a7060;
+    --parchment: #e8ddb5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Pro', Georgia, serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-image: 
+      radial-gradient(ellipse at 20% 0%, #1a150500 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, #c9a84c08 0%, transparent 60%),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c9a84c' fill-opacity='0.025'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    text-align: center;
+    padding: 3rem 1rem 2rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, #c9a84c12, transparent);
+    pointer-events: none;
+  }
+  .title-badge {
+    font-size: 0.7rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 0.75rem;
+  }
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(1.8rem, 5vw, 3.2rem);
+    font-weight: 900;
+    color: var(--gold-light);
+    text-shadow: 0 0 40px #c9a84c44;
+    letter-spacing: 0.05em;
+    line-height: 1.1;
+  }
+  .subtitle {
+    margin-top: 0.5rem;
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 1.05rem;
+  }
+  .divider {
+    display: flex; align-items: center; gap: 1rem;
+    margin: 1.5rem auto 0; max-width: 300px;
+    color: var(--gold-dim);
+    font-size: 0.8rem;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ===== LAYOUT ===== */
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  /* ===== SELECTOR ===== */
+  .selector-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.75rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .selector-section::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .section-label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 1rem;
+  }
+  .civ-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.5rem;
+  }
+  .civ-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Crimson Pro', serif;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.6rem;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    text-align: left;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .civ-btn:hover {
+    border-color: var(--gold-dim);
+    color: var(--text);
+    background: #1e1c10;
+  }
+  .civ-btn.active {
+    border-color: var(--gold);
+    color: var(--gold-light);
+    background: #1e1a08;
+    box-shadow: 0 0 12px #c9a84c22;
+  }
+  .civ-icon { font-size: 1rem; }
+
+  /* ===== ENEMY SELECTOR ===== */
+  .enemies-section {
+    background: var(--card);
+    border: 1px solid #3a1515;
+    border-radius: 4px;
+    padding: 1.75rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .enemies-section::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--red), transparent);
+  }
+  .enemy-pills {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+  }
+  .enemy-pill {
+    background: #2a1010;
+    border: 1px solid #3a1515;
+    color: #c07070;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .enemy-pill:hover { border-color: var(--red); color: #e09090; }
+  .enemy-pill.active { background: #3a1515; border-color: var(--red); color: #f0a0a0; }
+  .enemy-pill .rm { display: none; }
+  .enemy-pill.active .rm { display: inline; font-size: 0.7rem; opacity: 0.6; }
+
+  /* ===== DECISION PANEL ===== */
+  .decision-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.75rem;
+    position: relative;
+    overflow: hidden;
+    display: none;
+  }
+  .decision-panel.visible { display: block; }
+  .decision-panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold-light), transparent);
+  }
+
+  /* ===== CIV CARD ===== */
+  .civ-header {
+    display: flex; align-items: flex-start; gap: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .civ-emblem {
+    width: 64px; height: 64px;
+    border: 2px solid var(--gold-dim);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    background: radial-gradient(circle, #2a2210, var(--surface));
+    flex-shrink: 0;
+  }
+  .civ-name {
+    font-family: 'Cinzel', serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--gold-light);
+    line-height: 1;
+  }
+  .civ-unit {
+    color: var(--text-dim);
+    font-style: italic;
+    margin-top: 0.3rem;
+    font-size: 1rem;
+  }
+  .age-chips {
+    display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap;
+  }
+  .chip {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 3px;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.05em;
+  }
+  .chip.razes { background: #2a1a08; border: 1px solid #5a3a10; color: #c08040; }
+  .chip.castle { background: #081a2a; border: 1px solid #105a8a; color: #4090c0; }
+  .chip.imperial { background: #1a0828; border: 1px solid #5a1880; color: #a060d0; }
+
+  /* ===== STATS GRID ===== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1rem;
+  }
+  .stat-box-label {
+    font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 0.6rem;
+    font-family: 'Cinzel', serif;
+  }
+  .stat-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+  .stat-list li {
+    font-size: 0.9rem;
+    display: flex; align-items: center; gap: 0.4rem;
+    color: var(--text);
+  }
+  .stat-list li.strong::before { content: '⚔'; font-size: 0.7rem; color: var(--green-light); }
+  .stat-list li.weak::before { content: '⚠'; font-size: 0.7rem; color: var(--red); }
+  .stat-list li.best::before { content: '★'; font-size: 0.7rem; color: var(--gold); }
+
+  /* ===== MATCHUP ANALYSIS ===== */
+  .matchup-section {
+    margin-bottom: 1.5rem;
+  }
+  .matchup-title {
+    font-family: 'Cinzel', serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    color: var(--gold-dim);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+  }
+  .matchup-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 3px;
+    margin-bottom: 0.4rem;
+    border: 1px solid transparent;
+    font-size: 0.9rem;
+  }
+  .matchup-row.advantage {
+    background: #0d1f0d; border-color: #1a4a1a; color: #80c080;
+  }
+  .matchup-row.disadvantage {
+    background: #1f0d0d; border-color: #4a1a1a; color: #c08080;
+  }
+  .matchup-row.neutral {
+    background: var(--surface); border-color: var(--border); color: var(--text-dim);
+  }
+  .matchup-row .indicator { font-size: 1.1rem; flex-shrink: 0; }
+  .matchup-row .civ-label { flex: 1; font-weight: 600; }
+  .matchup-row .reason { font-size: 0.8rem; opacity: 0.7; font-style: italic; }
+
+  /* ===== STRATEGY BOX ===== */
+  .strategy-box {
+    background: #10120a;
+    border: 1px solid #2a3010;
+    border-radius: 3px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .strategy-box p {
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: var(--text);
+  }
+  .strategy-box .highlight {
+    color: var(--gold-light);
+    font-style: italic;
+  }
+
+  /* ===== DECISION ALERTS ===== */
+  .alert {
+    border-radius: 3px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    display: flex; gap: 0.6rem; align-items: flex-start;
+    border: 1px solid transparent;
+  }
+  .alert.danger { background: #1f0808; border-color: #5a1010; color: #e09090; }
+  .alert.success { background: #081f08; border-color: #105a10; color: #90d090; }
+  .alert.info { background: #080f1f; border-color: #10305a; color: #90b0e0; }
+  .alert.warning { background: #1f1008; border-color: #5a3010; color: #e0b080; }
+  .alert .icon { flex-shrink: 0; }
+
+  /* ===== NO SELECTION ===== */
+  .no-selection {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-dim);
+    font-style: italic;
+    font-size: 1.1rem;
+  }
+  .no-selection .big { font-size: 3rem; margin-bottom: 1rem; display: block; opacity: 0.3; }
+
+  /* ===== AGE GUIDE ===== */
+  .age-guide {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.5rem;
+  }
+  .age-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+  }
+  .age-table th {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .age-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #1a1810;
+    color: var(--text);
+    vertical-align: top;
+  }
+  .age-table tr:hover td { background: #151310; }
+  .kills-val { color: var(--gold-light); font-family: 'Cinzel', serif; font-weight: 700; }
+  .razes-val { color: #c08040; }
+
+  /* ===== SCROLL ANIMATIONS ===== */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .fade-in { animation: fadeIn 0.35s ease forwards; }
+
+  @media (max-width: 600px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .civ-header { flex-direction: column; gap: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-badge">⚔ Age of Empires II ⚔</div>
+  <h1>CBA Decision Engine</h1>
+  <div class="subtitle">Motor de decisión táctica para Castle Blood Arena</div>
+  <div class="divider">✦ selecciona tu civilización ✦</div>
+</header>
+
+<div class="app">
+
+  <!-- CIV SELECTOR -->
+  <div class="selector-section">
+    <div class="section-label">Tu Civilización</div>
+    <div class="civ-grid" id="civGrid"></div>
+  </div>
+
+  <!-- ENEMY SELECTOR -->
+  <div class="enemies-section" id="enemySection" style="display:none">
+    <div class="section-label">Enemigos en juego (selecciona los que veas)</div>
+    <div class="enemy-pills" id="enemyGrid"></div>
+  </div>
+
+  <!-- DECISION PANEL -->
+  <div class="decision-panel" id="decisionPanel">
+    <div id="decisionContent">
+      <div class="no-selection">
+        <span class="big">🏰</span>
+        Selecciona tu civilización para ver el análisis táctico
+      </div>
+    </div>
+  </div>
+
+  <!-- AGE GUIDE TABLE -->
+  <div class="age-guide">
+    <div class="section-label">Guía de Kills por Era — Todas las Civilizaciones</div>
+    <table class="age-table" id="ageTable">
+      <thead>
+        <tr>
+          <th>Civilización</th>
+          <th>Unidad Base</th>
+          <th>Razes para Vill.</th>
+          <th>Kills → Castle</th>
+          <th>Kills → Imperial</th>
+          <th>Mejores Unidades Imperiales</th>
+        </tr>
+      </thead>
+      <tbody id="ageTableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// DATA — CBA CIVILIZATIONS
+// ============================================================
+const CIVS = {
+  aztecs: {
+    name: "Aztecs", icon: "🐆",
+    unit: "Jaguar Warrior",
+    razes: 2, castle: 250, imperial: 400,
+    strongAgainst: ["goths","vikings","celts","incas","teutons","ethiopians","malay"],
+    weakAgainst: ["japanese","byzantines","britons","mayans","koreans","turks","spanish","portuguese"],
+    bestUnits: ["Arbalest", "Eagle Warrior", "Pikeman"],
+    strategy: "Devastador contra civs de infantería. Al llegar a imperial decide: si el enemigo hace caballería melee, usa piqueros (+8 ataque bonus). Si hacen arqueros, usa Eagles. Considera monjes contra Persas para convertir elefantes.",
+    tips: ["Fuerte contra casi toda infantería excepto Japoneses", "Piqueros con +8 bonus vs caballería", "Eagles son buen counter vs arqueros"]
+  },
+  berbers: {
+    name: "Berbers", icon: "🐪",
+    unit: "Camel Archer",
+    razes: 1, castle: 300, imperial: 600,
+    strongAgainst: ["koreans","mongols","indians","burmese"],
+    weakAgainst: ["saracens","goths","incas","italians","spanish"],
+    bestUnits: ["Camel", "Hand Cannoneer", "Genitour"],
+    strategy: "Si el enemigo tiene cavalry archers, farmea kills mientras tus compañeros te consiguen un raze. Los camellos se regeneran HP pero son caros y vulnerables a ranged. Usa Genitours contra arqueros en imperial.",
+    tips: ["1 solo raze necesario — el más fácil de escalar", "Camellos regeneran HP (bonus único)", "Evita enfrentar camellos contra unidades a distancia"]
+  },
+  britons: {
+    name: "Britons", icon: "🏹",
+    unit: "Longbowman",
+    razes: 1, castle: 300, imperial: 500,
+    strongAgainst: ["celts","teutons","franks","berbers","mongols","saracens"],
+    weakAgainst: ["goths","vietnamese","mayans","huns","indians","malay","spanish","koreans"],
+    bestUnits: ["Arbalest", "Tower"],
+    strategy: "NUNCA razes al inicio solo. Defiende tu base y la de tus compañeros mientras ellos te consiguen el raze. Produce Crossbowmen lo antes posible. En imperial, Arbalest con +6 de rango son devastadores. Construye stables para protegerte de rams.",
+    tips: ["Rango +6 en imperial = poder enorme", "Las torres completamente mejoradas hacen daño considerable", "Necesitas que un compañero te haga el raze"]
+  },
+  burmese: {
+    name: "Burmese", icon: "🐘",
+    unit: "Arambai",
+    razes: 3, castle: 300, imperial: 600,
+    strongAgainst: ["any_clumped","buildings"],
+    weakAgainst: ["britons","chinese","koreans","saracens","incas","italians","turks"],
+    bestUnits: ["Cavalier", "Champion"],
+    strategy: "Fácil de razear — puedes conseguir tus villagers pronto y hacer razes para compañeros. Los Arambai son inexactos pero letales contra unidades agrupadas. En imperial, Cavaliers con +6 attack bonus vs buildings pueden destruir bases sin murallas.",
+    tips: ["Arambai: dispara múltiples proyectiles — muy bueno contra grupos", "+6 ataque vs edificios (cavalier + arambai)", "Ayuda a tus compañeros con razes al inicio"]
+  },
+  byzantines: {
+    name: "Byzantines", icon: "⚜️",
+    unit: "Cataphract",
+    razes: 2, castle: 300, imperial: 600,
+    strongAgainst: ["goths","celts","aztecs","incas","ethiopians","teutons","vikings","malay"],
+    weakAgainst: ["japanese","slavs","persians","turks"],
+    bestUnits: ["Paladin", "Hand Cannoneer"],
+    strategy: "Ninguna civ (excepto Japoneses) tiene bonus de ataque vs Cataphractos. Ataca Incas, Saracenos e Italianos que son amenaza para tu equipo. Fácil farm de kills para llegar rápido a imperial. Produce Paladins o Hand Cannoneers según la comp enemiga.",
+    tips: ["Cataphractos: inmunes a la mayoría de bonuses de ataque", "Excelente contra toda infantería", "Débil contra Japoneses y pólvora"]
+  },
+  celts: {
+    name: "Celts", icon: "🌀",
+    unit: "Woad Raider",
+    razes: 2, castle: 250, imperial: 400,
+    strongAgainst: ["magyars","burmese","malay","goths","buildings"],
+    weakAgainst: ["japanese","byzantines","slavs","teutons","aztecs","britons","koreans","turks","spanish","portuguese"],
+    bestUnits: ["Paladin", "Ram", "Tower"],
+    strategy: "Son rápidos y tienen bonus vs edificios — ayuda a compañeros con razes (britons, mayans, vietnamese). Contra Persas/Huns/Goths: raza un front gate rápido y rushea sus castles. En imperial: Paladins. Si enemigos hacen arqueros, usa Rams que tienen massive HP bonus.",
+    tips: ["Velocidad de movimiento bonus — excelente para razes", "Torres disparan 20% más rápido con la tech única", "Rams son ideales como escudo contra arqueros"]
+  },
+  chinese: {
+    name: "Chinese", icon: "🐉",
+    unit: "Chu Ko Nu",
+    razes: 2, castle: 250, imperial: 500,
+    strongAgainst: ["celts","franks","saracens","teutons"],
+    weakAgainst: ["goths","vietnamese","mayans","huns","indians","koreans"],
+    bestUnits: ["Cavalier", "Arbalest", "Ram"],
+    strategy: "Gran grupo de unidades = razes rápidos, pero mejor defender y dejar que compañeros razeen. En Castle Age tienen HP bonus en muros y puertas — excelentes para murallas de aliados (goths, persas, magyars). En imperial tienen bonus vs edificios para razear solos.",
+    tips: ["Mejores para construir murallas a aliados en Castle Age", "Chu Ko Nu dispara múltiples flechas", "Cavalier y Arbalest son sólidos pero promedio"]
+  },
+  ethiopians: {
+    name: "Ethiopians", icon: "⚡",
+    unit: "Shotel Warrior",
+    razes: 2, castle: "YA en Castle", imperial: 500,
+    strongAgainst: ["goths","celts","malay","britons","mayans","buildings"],
+    weakAgainst: ["japanese","byzantines","aztecs","turks","spanish"],
+    bestUnits: ["Arbalest", "Ram"],
+    strategy: "¡Empiezas en Castle Age! El Shotel tiene ataque altísimo — genial para razear. Si nadie necesita ayuda, consigue tus razes rápido y produce Crossbowmen. En imperial, la línea de arqueros dispara 15% más rápido. Los Siege Rams Etíopes tienen área de efecto impresionante.",
+    tips: ["Único en empezar en Castle Age", "Arqueros disparan 15% más rápido", "Siege Rams con enorme área de efecto"]
+  },
+  franks: {
+    name: "Franks", icon: "⚔️",
+    unit: "Throwing Axeman",
+    razes: 3, castle: 250, imperial: 500,
+    strongAgainst: ["khmer","indians","persians","magyars","malay","ethiopians","buildings"],
+    weakAgainst: ["japanese","byzantines","slavs","teutons","aztecs","britons","mayans","koreans","turks","spanish","portuguese"],
+    bestUnits: ["Paladin"],
+    strategy: "Los Axemans razean rápido por bonus vs edificios. Raza contra infantería, no arqueros. MUY cuidado con Teutones y Slavos — no tienes counter, pide ayuda. En late game, Paladins con HP bonus y stables 40% más rápidos son devastadores. ¡Administra el oro!",
+    tips: ["Stables trabajan 40% más rápido", "Paladins con HP bonus extra únicos", "Cuidado con el gasto de oro en Paladins"]
+  },
+  goths: {
+    name: "Goths", icon: "💀",
+    unit: "Huskarl",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["britons","mayans","vietnamese","italians","indians","berbers","mongols","koreans","buildings"],
+    weakAgainst: ["japanese","byzantines","teutons","ethiopians","celts","huns","slavs","aztecs"],
+    bestUnits: ["Huskarl", "Halberdier"],
+    strategy: "¡Civilización especial! Aplica presión a civs de arqueros lo antes posible — incluso escuadras de 8 unidades compran tiempo valioso. Serás el objetivo #1 del enemigo, pide defensa a tus compañeros. No puedes construir muros de piedra — pide walling. En imperial: Huskarls vs arqueros o Halberdiers vs caballería.",
+    tips: ["Huskarls tienen altísima resistencia a arqueros (armadura pierce)", "NO construyas palisade gates — son razes gratis para el enemigo", "Pide murallas a Chinese o compañeros"]
+  },
+  huns: {
+    name: "Huns", icon: "🏇",
+    unit: "Tarkan",
+    razes: 5, castle: 200, imperial: 400,
+    strongAgainst: ["britons","mayans","indians","koreans","berbers","mongols","vietnamese","buildings"],
+    weakAgainst: ["japanese","teutons","vikings","saracens","incas","italians"],
+    bestUnits: ["Paladin"],
+    strategy: "Otra civ especial — OFENSIVA EXTREMA. Pide defensa de inmediato, serás el objetivo #1. No mates unidades — enfócate en ABRIR todas las bases enemigas. Una vez abiertas, el enemigo no sabe dónde atacarás y debe dividir tropas para defender, lo que da ventaja enorme a tu equipo.",
+    tips: ["5 razes = presión constante en toda la línea", "Más kills rápidos para llegar a imperial", "No gastes tiempo matando — abre bases enemigas"]
+  },
+  incas: {
+    name: "Incas", icon: "🦙",
+    unit: "Kamayuk",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["cavalry","persians","khmer","franks","berbers"],
+    weakAgainst: ["britons","koreans","mayans","archers"],
+    bestUnits: ["Kamayuk", "Eagle Warrior", "Slinger"],
+    strategy: "Los Kamayuks tienen reach bonus — atacan unidades adicionales en fila. Excelentes contra caballería. En imperial considera Slingers contra infantería agrupada. Coordina con tu equipo para cubrir tus debilidades contra arqueros.",
+    tips: ["Kamayuk: +1 reach — golpea unidades detrás del objetivo", "Eagles son buenos counter vs arqueros", "Fuerte contra toda caballería pesada"]
+  },
+  indians: {
+    name: "Indians", icon: "🐘",
+    unit: "Elephant Archer",
+    razes: 2, castle: 300, imperial: 600,
+    strongAgainst: ["britons","berbers","mongols","infantry"],
+    weakAgainst: ["aztecs","incas","byzantines","persians","monks"],
+    bestUnits: ["Imperial Camel", "Hand Cannoneer"],
+    strategy: "Los Elephant Archers son lentos pero resistentes. Imperial Camel es uno de los mejores counters de caballería del juego. Hand Cannoneers con el attack bonus de Indios son devastadores. Cuidado con Aztecas e Incas que tienen bonus vs caballería/elefantes.",
+    tips: ["Imperial Camel — mejor counter de caballería", "Elephant Archer: mucho HP, lento", "Hand Cannoneer con ataque extra"]
+  },
+  italians: {
+    name: "Italians", icon: "⛵",
+    unit: "Genitour",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["berbers","huns","mongols","cavalry_archers"],
+    weakAgainst: ["goths","byzantines","teutons"],
+    bestUnits: ["Genitour", "Hand Cannoneer", "Condottiero"],
+    strategy: "Los Genitours son excelentes counters de cavalry archers. Condottiero en barracks en imperial es producción muy rápida de infantería anti-pólvora. Genitours y Hand Cannoneers forman un combo sólido en late game.",
+    tips: ["Condottiero: producción rápida, bueno vs pólvora", "Genitour: skirmisher a caballo — perfecto vs CA", "Dock upgrades más baratos (útil en mapas acuáticos)"]
+  },
+  japanese: {
+    name: "Japanese", icon: "⛩️",
+    unit: "Samurai",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["byzantines","aztecs","celts","franks","vikings","goths","teutons","unique_units"],
+    weakAgainst: ["britons","archers","gunpowder"],
+    bestUnits: ["Samurai", "Champion", "Cavalier"],
+    strategy: "Los Samurai tienen ENORME bonus de ataque vs unidades únicas — +12 en castle, más en imperial. Casi toda civ tiene unidades únicas, por lo que los Samurai son universalmente fuertes. Ataca cualquier civ que use su unidad única. Infantería general también está bien mejorada.",
+    tips: ["Samurai: +12 bonus vs unidades únicas", "Molinos de pesca generan más food", "Línea de infantería completamente mejorada"]
+  },
+  khmer: {
+    name: "Khmer", icon: "🌿",
+    unit: "Ballista Elephant",
+    razes: 2, castle: 300, imperial: 600,
+    strongAgainst: ["buildings","infantry","archers"],
+    weakAgainst: ["franks","aztecs","monks","anti_cavalry"],
+    bestUnits: ["Ballista Elephant", "Battle Elephant", "Scorpion"],
+    strategy: "Ballista Elephants son devastadores contra unidades agrupadas. Muy lentos pero con HP masivo. Scorpions en imperial pueden limpiar infantería eficientemente. Cuidado con Francos que tienen bonus vs elefantes.",
+    tips: ["Ballista Elephant: scorpion a caballo con HP masivo", "Sin necesidad de tech de establo para Battle Elephant", "Scorpions en imperial son muy eficientes"]
+  },
+  koreans: {
+    name: "Koreans", icon: "🏯",
+    unit: "War Wagon",
+    razes: 2, castle: 300, imperial: 600,
+    strongAgainst: ["britons","chinese","ethiopians","goths","huns"],
+    weakAgainst: ["camels","anti_cavalry","berbers"],
+    bestUnits: ["War Wagon", "Turtle Ship", "Tower"],
+    strategy: "War Wagons son cavalry archers con escudo — muy resistentes pero caros. Torres completamente mejoradas en CBA pueden ser torre defensiva devastadora. Coreanos tienen uno de los mejores juegos de towers del juego.",
+    tips: ["War Wagon: cavalry archer con alto HP y armadura", "Torres +2 rango en imperial", "Fortified Wall muy barata (útil para murallas de aliados)"]
+  },
+  magyars: {
+    name: "Magyars", icon: "🏹",
+    unit: "Magyar Huszar",
+    razes: 2, castle: "YA en Castle", imperial: 500,
+    strongAgainst: ["siege","monks","teutons"],
+    weakAgainst: ["celts","camel_civs","britons"],
+    bestUnits: ["Magyar Huszar", "Paladin", "Cavalry Archer"],
+    strategy: "¡Arrancas en Castle Age! Magyar Huszar no cuesta oro — spam masivo desde el inicio. En Castle Age puedes ir Crossbowmen primero (aparecen más rápido y tienen más rango que CA). En imperial, Paladins + Cavalry Archers son un combo devastador. Consigue villagers lo antes posible para mantener producción constante.",
+    tips: ["Magyar Huszar: costo 0 de oro — spam infinito", "Empieza en Castle Age — ventaja de producción inmediata", "Crossbow en castle > CA por velocidad de producción y rango"]
+  },
+  malay: {
+    name: "Malay", icon: "🌊",
+    unit: "Karambit Warrior",
+    razes: 2, castle: "YA en Castle", imperial: 300,
+    strongAgainst: ["archers","siege","buildings"],
+    weakAgainst: ["aztecs","byzantines","japanese","goths"],
+    bestUnits: ["Battle Elephant", "Karambit Warrior", "Arbalest"],
+    strategy: "¡Arrancas en Castle Age! Solo 300 kills para Imperial — el más rápido de todos. Usa esa ventaja de tempo: masifica Arbalest antes de que el enemigo se organice y toma control de su base. Malay es débil en late game (sin siege ram ni buena caballería), así que debes explotar la ventaja de llegar primero a Imperial.",
+    tips: ["Solo 300 kills para Imperial — el más rápido del juego", "Empieza en Castle Age — ventaja inmediata", "Domina con Arbalest antes de que el enemigo llegue a Imperial"]
+  },
+  malians: {
+    name: "Malians", icon: "🦁",
+    unit: "Gbeto",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["teutons","infantry_heavy"],
+    weakAgainst: ["cavalry","archers"],
+    bestUnits: ["Gbeto", "Farimba Cavalry"],
+    strategy: "Los Gbetos son jabalinas rápidas que pueden kitar unidades melee. Infantería Malí tiene más HP. En imperial, Farimba cavalry son caballería con bonus de ataque. Coordinación con tu equipo es clave.",
+    tips: ["Gbeto: jabalina — puede kitar melee", "Infantería con más HP", "Minería de oro más barata"]
+  },
+  mayans: {
+    name: "Mayans", icon: "🌙",
+    unit: "Plume Archer",
+    razes: 1, castle: 300, imperial: 500,
+    strongAgainst: ["britons","infantry","celts","franks"],
+    weakAgainst: ["goths","huns","vietnamese","italians"],
+    bestUnits: ["Arbalest", "Eagle Warrior"],
+    strategy: "Plumed Archers son muy resistentes y rápidos. Solo 1 raze necesario. En imperial, Arbalest combinado con Eagles es una combo potente. Resources duran 15% más, lo que te da ventaja económica sustancial.",
+    tips: ["Resources duran 15% más — ventaja económica", "Plumed Archer: más HP y velocidad que arquero estándar", "Eagles y Arbalest se complementan bien"]
+  },
+  mongols: {
+    name: "Mongols", icon: "🏹",
+    unit: "Mangudai",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["siege","monks","infantry"],
+    weakAgainst: ["italians","berbers","camels","anti_CA"],
+    bestUnits: ["Mangudai", "Cavalry Archer", "Trebuchet"],
+    strategy: "Mangudai es el mejor cavalry archer del juego — resistente a fire y con bonus vs siege. Siege despliega más rápido. En imperial, Mangudai + Cavalry Archer son una storm de daño a distancia. Trebs con +25% velocidad de disparo son amenaza para edificios.",
+    tips: ["Mangudai: CA con bonus vs siege y fire resistance", "Siege despliega 2x más rápido", "Trebs disparan 25% más rápido"]
+  },
+  persians: {
+    name: "Persians", icon: "🐘",
+    unit: "War Elephant",
+    razes: 3, castle: 200, imperial: 400,
+    strongAgainst: ["buildings","melee","infantry"],
+    weakAgainst: ["aztecs","incas","monks","anti_cavalry","byzantines"],
+    bestUnits: ["War Elephant", "Paladin"],
+    strategy: "War Elephants son las unidades más fuertes del juego en melee — pero lentas y vulnerables a monjes. Llegas rápido a imperial (200/400). El TCH de Persas trabaja más rápido = más recursos. Cuidado con Aztecas, Incas y monjes que son su mayor debilidad.",
+    tips: ["TCH trabaja 10% más rápido (Castle) y 20% (Imperial)", "War Elephant: 600 HP, el monstruo del melee", "Muy vulnerable a conversión de monjes"]
+  },
+  portuguese: {
+    name: "Portuguese", icon: "🔫",
+    unit: "Organ Gun",
+    razes: 3, castle: 300, imperial: 500,
+    strongAgainst: ["infantry","buildings","archers"],
+    weakAgainst: ["cavalry","camels","aztecs"],
+    bestUnits: ["Organ Gun", "Hand Cannoneer", "Caravel"],
+    strategy: "Organ Gun dispara múltiples proyectiles — devastador vs grupos de infantería. Pólvora con +10% HP en imperial. Hand Cannoneers son de los mejores del juego para Portugueses. Todos los recursos cuestan 15% menos — enorme ventaja económica.",
+    tips: ["Recursos cuestan 15% menos", "Organ Gun: AoE vs infantería agrupada", "Pólvora con +10% HP y 15% más barata"]
+  },
+  saracens: {
+    name: "Saracens", icon: "🌙",
+    unit: "Mameluke",
+    razes: 2, castle: 300, imperial: 600,
+    strongAgainst: ["berbers","huns","cavalry","buildings"],
+    weakAgainst: ["goths","archers","infantry_mass"],
+    bestUnits: ["Mameluke", "Heavy Camel"],
+    strategy: "Mamelucos son cavalry archers que actúan como camellos — counters de caballería a distancia. Muy caros pero devastadores. Heavy Camels con bonus de ataque vs caballería. Mercado sin costo de fee — útil para intercambio de recursos.",
+    tips: ["Mameluke: cavalry archer + camel en uno", "+4 ataque Mamelucos vs edificios", "Heavy Camel con bonus extra vs caballería"]
+  },
+  slavs: {
+    name: "Slavs", icon: "⚔️",
+    unit: "Boyar",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["franks","celts","byzantines","cavalry"],
+    weakAgainst: ["archers","monks","incas"],
+    bestUnits: ["Boyar", "Paladin", "Siege"],
+    strategy: "Boyar es una de las unidades únicas más resistentes — alta armadura melee. Siege despliega más rápido (como Mongols). Infantería con +10% HP hace que los Slavos sean duros de matar. En imperial, Paladins + Boyars son una comp devastadora.",
+    tips: ["Boyar: 10/8 armadura — casi imposible de matar con melee", "Granjas producen más comida (eco ventaja)", "Siege despliega más rápido"]
+  },
+  spanish: {
+    name: "Spanish", icon: "🔫",
+    unit: "Conquistador",
+    razes: 3, castle: 300, imperial: 600,
+    strongAgainst: ["infantry","archers","berbers"],
+    weakAgainst: ["camels","aztecs","incas"],
+    bestUnits: ["Conquistador", "Hand Cannoneer", "Trebuchet"],
+    strategy: "Conquistador a caballo + pólvora = una de las mejores civs de late game. Trebs disparan instantáneamente (sin tiempo de deploy) — devastador para sitios. Hand Cannoneers completamente mejorados. Bonus de construcción de hermanos para edificios más rápidos.",
+    tips: ["Trebs sin tiempo de deploy — instantáneos", "Conquistador: CA con ataque de pólvora", "Todo upgrades de blacksmith gratis"]
+  },
+  teutons: {
+    name: "Teutons", icon: "🛡️",
+    unit: "Teutonic Knight",
+    razes: 2, castle: 300, imperial: 600,
+    strongAgainst: ["franks","celts","slavs","infantry"],
+    weakAgainst: ["japanese","byzantines","archers","camels","incas"],
+    bestUnits: ["Teutonic Knight", "Paladin", "Hand Cannoneer"],
+    strategy: "Teutonic Knight es el tanque definitivo — 100 HP y armadura masiva. Torres atacan con doble flecha. Paladins tienen +2 armadura extra. Cuidado con arqueros masivos y camels. En CBA su fortaleza defensiva es brutal.",
+    tips: ["TK: 4/9 armadura — casi inmune a melee", "Torres disparan con 2 flechas", "+2 armadura en Paladins"]
+  },
+  turks: {
+    name: "Turks", icon: "🔫",
+    unit: "Janissary",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["aztecs","byzantines","celts","infantry"],
+    weakAgainst: ["camels","incas","goths"],
+    bestUnits: ["Janissary", "Hand Cannoneer", "Hussar"],
+    strategy: "Pólvora completamente gratis de upgrade. Janissary y Hand Cannoneer son los mejores del juego. Gold mining +15%. Hussars gratis (upgrade). En CBA los Turcos son una potencia de late game imparable con pólvora.",
+    tips: ["Todos upgrades de pólvora gratis", "Janissary: +22 HP vs estándar", "Gold mining 15% más eficiente"]
+  },
+  vietnamese: {
+    name: "Vietnamese", icon: "🐘",
+    unit: "Rattan Archer",
+    razes: 2, castle: 300, imperial: 500,
+    strongAgainst: ["britons","goths","chinese","mongols"],
+    weakAgainst: ["cavalry","camels","teutons"],
+    bestUnits: ["Rattan Archer", "Battle Elephant"],
+    strategy: "Rattan Archer tiene 7/7 de armadura contra proyectiles — casi inmune a arqueros. Ves todas las unidades enemigas desde el inicio (scouting bonus). Battle Elephants en imperial son una opción devastadora. El Imperial Skirmisher disponible.",
+    tips: ["Rattan Archer: 7/7 pierce armor — contador de arqueros", "Ves todas las unidades enemigas en el mapa", "Imperial Skirmisher único de Vietnamese"]
+  },
+  vikings: {
+    name: "Vikings", icon: "⛵",
+    unit: "Berserk",
+    razes: 2, castle: "YA en Castle", imperial: 400,
+    strongAgainst: ["franks","teutons","huns","buildings"],
+    weakAgainst: ["aztecs","byzantines","japanese","goths"],
+    bestUnits: ["Berserk", "Longboat", "Champion"],
+    strategy: "Berserks regeneran HP — excelentes para combates prolongados. Infantry con más HP. Wheelbarrow y Hand Cart son gratis — ventaja económica enorme. En imperial, Champions son sólidos. Cuidado con civs anti-infantería.",
+    tips: ["Berserk regenera HP — tanquea bien", "Wheelbarrow y Hand Cart gratis", "Infantería con HP bonus extra"]
+  }
+};
+
+// Matchup analysis helper
+function getMatchup(myCiv, enemyCiv) {
+  const me = CIVS[myCiv];
+  if (!me) return 'neutral';
+  if (me.strongAgainst.includes(enemyCiv)) return 'advantage';
+  if (me.weakAgainst.includes(enemyCiv)) return 'disadvantage';
+  return 'neutral';
+}
+
+function getMatchupReason(myCiv, enemyCiv) {
+  const enemy = CIVS[enemyCiv];
+  const me = CIVS[myCiv];
+  if (!me || !enemy) return '';
+  if (me.strongAgainst.includes(enemyCiv)) {
+    return `Tu ${me.unit} tiene ventaja vs ${enemy.unit}`;
+  }
+  if (me.weakAgainst.includes(enemyCiv)) {
+    return `${enemy.unit} es difícil para tu ${me.unit}`;
+  }
+  return 'Matchup equilibrado';
+}
+
+// State
+let selectedCiv = null;
+let selectedEnemies = new Set();
+
+// Build civ buttons
+const civGrid = document.getElementById('civGrid');
+Object.entries(CIVS).forEach(([key, civ]) => {
+  const btn = document.createElement('button');
+  btn.className = 'civ-btn';
+  btn.dataset.civ = key;
+  btn.innerHTML = `<span class="civ-icon">${civ.icon}</span>${civ.name}`;
+  btn.onclick = () => selectCiv(key);
+  civGrid.appendChild(btn);
+});
+
+// Build age table
+const tbody = document.getElementById('ageTableBody');
+Object.entries(CIVS).forEach(([key, civ]) => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="color:var(--gold-light);font-family:'Cinzel',serif">${civ.icon} ${civ.name}</td>
+    <td style="font-style:italic;color:var(--text-dim)">${civ.unit}</td>
+    <td><span class="razes-val">🏠 ${civ.razes}</span></td>
+    <td><span class="kills-val" style="${civ.castle === 'YA en Castle' ? 'color:#a060d0;font-size:0.8rem' : ''}">${civ.castle}</span></td>
+    <td><span class="kills-val">${civ.imperial}</span></td>
+    <td style="font-size:0.8rem;color:var(--text-dim)">${civ.bestUnits.join(', ')}</td>
+  `;
+  tbody.appendChild(tr);
+});
+
+function selectCiv(key) {
+  selectedCiv = key;
+  selectedEnemies = new Set();
+  // Update button states
+  document.querySelectorAll('.civ-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.civ === key);
+  });
+  // Show enemy selector
+  buildEnemySelector(key);
+  document.getElementById('enemySection').style.display = 'block';
+  // Render decision
+  renderDecision();
+}
+
+function buildEnemySelector(myCivKey) {
+  const grid = document.getElementById('enemyGrid');
+  grid.innerHTML = '';
+  Object.entries(CIVS).forEach(([key, civ]) => {
+    if (key === myCivKey) return;
+    const pill = document.createElement('div');
+    pill.className = 'enemy-pill';
+    pill.dataset.civ = key;
+    pill.innerHTML = `${civ.icon} ${civ.name} <span class="rm">✕</span>`;
+    pill.onclick = () => toggleEnemy(key, pill);
+    grid.appendChild(pill);
+  });
+}
+
+function toggleEnemy(key, pill) {
+  if (selectedEnemies.has(key)) {
+    selectedEnemies.delete(key);
+    pill.classList.remove('active');
+  } else {
+    selectedEnemies.add(key);
+    pill.classList.add('active');
+  }
+  renderDecision();
+}
+
+function renderDecision() {
+  if (!selectedCiv) return;
+  const panel = document.getElementById('decisionPanel');
+  panel.classList.add('visible');
+  const civ = CIVS[selectedCiv];
+  const enemies = Array.from(selectedEnemies);
+
+  let matchupRows = '';
+  if (enemies.length > 0) {
+    matchupRows = enemies.map(eKey => {
+      const e = CIVS[eKey];
+      const matchup = getMatchup(selectedCiv, eKey);
+      const reason = getMatchupReason(selectedCiv, eKey);
+      const icons = { advantage: '✅', disadvantage: '⚠️', neutral: '➖' };
+      const labels = { advantage: 'VENTAJA', disadvantage: 'PELIGRO', neutral: 'NEUTRAL' };
+      return `
+        <div class="matchup-row ${matchup}">
+          <span class="indicator">${icons[matchup]}</span>
+          <span class="civ-label">${e.icon} ${e.name}</span>
+          <span class="reason">${labels[matchup]} — ${reason}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Generate alerts based on matchups
+  let alerts = '';
+  const dangers = enemies.filter(e => getMatchup(selectedCiv, e) === 'disadvantage');
+  const advantages = enemies.filter(e => getMatchup(selectedCiv, e) === 'advantage');
+  
+  if (dangers.length > 0) {
+    const dangerNames = dangers.map(e => CIVS[e].name).join(', ');
+    alerts += `<div class="alert danger"><span class="icon">⚠️</span><span><strong>PELIGRO:</strong> ${dangerNames} son counters de tu civilización. Pide ayuda a tus aliados para cubrirlos.</span></div>`;
+  }
+  if (advantages.length > 0) {
+    const advNames = advantages.map(e => CIVS[e].name).join(', ');
+    alerts += `<div class="alert success"><span class="icon">⚔️</span><span><strong>ATACA:</strong> ${advNames} son targets prioritarios — tienes ventaja directa contra ellos.</span></div>`;
+  }
+  if (civ.razes === 1) {
+    alerts += `<div class="alert info"><span class="icon">🏠</span><span><strong>SOLO 1 RAZE</strong> necesario — escala rápido. Defiende mientras consigues ese raze.</span></div>`;
+  }
+  if (civ.razes >= 4) {
+    alerts += `<div class="alert warning"><span class="icon">🔥</span><span><strong>${civ.razes} RAZES</strong> necesarios — prioriza ofensiva constante y abre bases enemigas.</span></div>`;
+  }
+
+  document.getElementById('decisionContent').innerHTML = `
+    <div class="fade-in">
+      <div class="civ-header">
+        <div class="civ-emblem">${civ.icon}</div>
+        <div>
+          <div class="civ-name">${civ.name}</div>
+          <div class="civ-unit">Unidad base: ${civ.unit}</div>
+          <div class="age-chips">
+            <span class="chip razes">🏠 ${civ.razes} Raze${civ.razes !== 1 ? 's' : ''}</span>
+            <span class="chip castle">⚔ Castle: ${civ.castle === 'YA en Castle' ? '★ YA en Castle' : civ.castle + ' kills'}</span>
+            <span class="chip imperial">👑 Imperial: ${civ.imperial} kills</span>
+          </div>
+        </div>
+      </div>
+
+      ${alerts}
+
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-box-label">Fuerte Contra</div>
+          <ul class="stat-list">
+            ${civ.strongAgainst.map(s => {
+              const c = CIVS[s];
+              return `<li class="strong">${c ? c.icon + ' ' + c.name : s}</li>`;
+            }).join('')}
+          </ul>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-label">Débil Contra</div>
+          <ul class="stat-list">
+            ${civ.weakAgainst.map(s => {
+              const c = CIVS[s];
+              return `<li class="weak">${c ? c.icon + ' ' + c.name : s}</li>`;
+            }).join('')}
+          </ul>
+        </div>
+      </div>
+
+      <div class="stat-box" style="margin-bottom:1rem">
+        <div class="stat-box-label">Mejores Unidades en Imperial</div>
+        <ul class="stat-list">
+          ${civ.bestUnits.map(u => `<li class="best">${u}</li>`).join('')}
+        </ul>
+      </div>
+
+      ${matchupRows ? `
+        <div class="matchup-section">
+          <div class="matchup-title">Análisis de Matchups vs Enemigos Seleccionados</div>
+          ${matchupRows}
+        </div>
+      ` : ''}
+
+      <div class="strategy-box">
+        <div class="section-label" style="margin-bottom:0.5rem">Estrategia Recomendada</div>
+        <p>${civ.strategy}</p>
+      </div>
+
+      <div>
+        <div class="section-label">Tips Rápidos</div>
+        ${civ.tips.map(t => `<div class="alert info" style="margin-bottom:0.4rem"><span class="icon">💡</span><span>${t}</span></div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
